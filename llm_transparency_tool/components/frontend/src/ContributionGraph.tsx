@@ -511,7 +511,12 @@ const ContributionGraph = ({ args }: ComponentProps) => {
         yScale
     ])
 
-    return <svg ref={svgRef} width={totalW} height={totalH}></svg>
+
+    return (
+        <div className="scroll-container">
+            <svg ref={svgRef} width={totalW} height={totalH}></svg>
+        </div>)
 }
+
 
 export default withStreamlitConnection(ContributionGraph)

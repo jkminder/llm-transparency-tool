@@ -5,7 +5,15 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
+ .scroll-container {
+    overflow-x: auto;
+    white-space: nowrap;
+    width: 100%;
+}
 
+.scroll-container svg {
+    display: inline-block;
+}
 .graph-container {
     display: flex;
     justify-content: center;

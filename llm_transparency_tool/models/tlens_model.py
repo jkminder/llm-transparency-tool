@@ -14,6 +14,9 @@ from fancy_einsum import einsum
 from jaxtyping import Float, Int
 from typeguard import typechecked
 import streamlit as st
+from transformer_lens import HookedTransformer, HookedTransformerConfig
+import os
+import json
 
 from llm_transparency_tool.models.transparent_llm import ModelInfo, TransparentLlm
 
@@ -23,6 +26,32 @@ class _RunInfo:
     tokens: Int[torch.Tensor, "batch pos"]
     logits: Float[torch.Tensor, "batch pos d_vocab"]
     cache: transformer_lens.ActivationCache
+
+def load_from_local(path):
+    # ADAPTED FROM https://github.com/magiccpp/llm-transparency-tool/blob/main/llm_transparency_tool/models/tlens_model.py
+    # check if config.json exists
+    # if not, return None
+    # if it does, load the model
+    # if not, return None
+    config_path = os.path.join(path, "config.json")
+    if not os.path.exists(config_path):
+        return None
+    
+    with open(config_path, "r") as f:
+        config = json.load(f)
+    
+    model_cfg = HookedTransformerConfig(**config)
+    hooked_model = HookedTransformer(model_cfg)
+
+    # find if there is a model file with suffix .pth, .pt or .bin
+    model_files = [f for f in os.listdir(path) if f.endswith(".pth") or f.endswith(".pt") or f.endswith(".bin")]
+    if len(model_files) == 0:
+        return None
+    model_file = model_files[0]
+    model_file_path = os.path.join(path, model_file)
+    hooked_model.load_state_dict(torch.load(model_file_path))
+    hooked_model.eval()
+    return hooked_model
 
 
 @st.cache_resource(
@@ -38,11 +67,17 @@ def load_hooked_transformer(
     hf_model: Optional[transformers.PreTrainedModel] = None,
     tlens_device: str = "cuda",
     dtype: torch.dtype = torch.float32,
+    path: Optional[str] = None,
 ):
     # if tlens_device == "cuda":
     #     n_devices = torch.cuda.device_count()
     # else:
     #     n_devices = 1
+    
+    if path is not None and hf_model is None:
+        # Load the model from state dict as HookedTransformer    
+        return load_from_local(path)
+    
     tlens_model = transformer_lens.HookedTransformer.from_pretrained(
         model_name,
         hf_model=hf_model,
@@ -54,6 +89,7 @@ def load_hooked_transformer(
         dtype=dtype,
     )
     tlens_model.eval()
+    torch.cuda.empty_cache()
     return tlens_model
 
 
@@ -80,6 +116,7 @@ class TransformerLensTransparentLlm(TransparentLlm):
         tokenizer: Optional[transformers.PreTrainedTokenizer] = None,
         device: str = "gpu",
         dtype: torch.dtype = torch.float32,
+        path: Optional[str] = None,
     ):
         if device == "gpu":
             self.device = "cuda"
@@ -101,6 +138,7 @@ class TransformerLensTransparentLlm(TransparentLlm):
         self._run_exception = RuntimeError(
             "Tried to use the model output before calling the `run` method"
         )
+        self._path = path
 
     def copy(self):
         import copy
@@ -113,8 +151,9 @@ class TransformerLensTransparentLlm(TransparentLlm):
             hf_model=self.hf_model,
             tlens_device=self.device,
             dtype=self.dtype,
+            path=self._path,
         )
-
+        
         if self.hf_tokenizer is not None:
             tlens_model.set_tokenizer(self.hf_tokenizer, default_padding_side="left")
 

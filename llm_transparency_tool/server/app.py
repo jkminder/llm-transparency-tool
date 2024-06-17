@@ -482,7 +482,7 @@ class App:
         else:
             dtype = st.selectbox(
                 "Precision",
-                [torch.float16, torch.bfloat16, torch.float32],
+                [torch.bfloat16, torch.float16, torch.float32],
                 index=0,
             )
 

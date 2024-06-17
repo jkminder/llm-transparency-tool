@@ -49,6 +49,7 @@ cd llm_transparency_tool/components/frontend
 yarn install
 yarn build
 ```
+If you get a wierd error with `react-dev-utils`, run `npm install --save-dev react-dev-utils --legacy-peer-deps`.
 
 ### Launch
 
